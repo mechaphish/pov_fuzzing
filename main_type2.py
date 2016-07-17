@@ -1,15 +1,20 @@
+import os
 import sys
 import logging
 logging.basicConfig()
 l = logging.getLogger("main_type2")
 l.setLevel("INFO")
 
-import dotenv
-dotenv.load_dotenv("/home/vagrant/.env.development")
-
 from farnsworth.models import Exploit, PovFuzzer2Job, Test
 
 import pov_fuzzing
+
+# make compilerex executable
+import compilerex
+bin_path = os.path.join(os.path.dirname(compilerex.__file__), "../bin")
+for f in os.listdir(bin_path):
+    os.chmod(os.path.join(bin_path, f), 0777)
+    os.chmod(os.path.join(bin_path, f), 0777)
 
 if len(sys.argv) != 2:
     print "Usage:", "job_id"
