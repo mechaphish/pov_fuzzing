@@ -29,7 +29,7 @@ cbn = job.cs.cbns_original[0]
 crash = job.input_crash
 
 crash_payload = str(crash.blob)
-if len(crash_payload) > 5000:
+if len(crash_payload) > 20000:
     l.warning("payload has %d bytes, refusing to run", len(crash_payload))
     sys.exit(0)
 
