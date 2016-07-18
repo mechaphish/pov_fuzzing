@@ -62,7 +62,7 @@ l.info("Pov fuzzer 2 beginning to exploit crash %d for cbn %d", crash.id, cbn.id
 pov_fuzzer = pov_fuzzing.Type2CrashFuzzer(cbn.path, crash=crash_payload)
 
 if pov_fuzzer.exploitable():
-    e = Exploit.create(cs=job.cs, job=job, pov_type='type1',
+    e = Exploit.create(cs=job.cs, job=job, pov_type='type2',
                    method="fuzzer",
                    c_code=pov_fuzzer.dump_c(),
                    blob=pov_fuzzer.dump_binary())
