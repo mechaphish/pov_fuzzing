@@ -382,7 +382,7 @@ class Type2CrashFuzzer(object):
                     else:
                         break
 
-            if controlled_bits != 0:
+            if bin(controlled_bits).count("1") > 1:
                 l.info("Register %s has the following bitmask %s for bytes %s of the input",
                        reg, hex(controlled_bits), byte_indices)
                 byte_analysis.register_bitmasks[reg] = controlled_bits
