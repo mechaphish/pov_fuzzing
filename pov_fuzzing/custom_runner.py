@@ -117,7 +117,7 @@ class CustomRunner(object):
                 self._load_core_values(core_files[0])
 
                 if grab_crashing_inst and self.reg_vals is not None and "eip" in self.reg_vals:
-                    p1 = subprocess.Popen([os.path.abspath(self.binary)], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                    p1 = subprocess.Popen([os.path.abspath(self.binaries[0])], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
                     args = ["sudo", "gdb", "-q", "-batch", "-p", str(p1.pid), "-ex", 'set disassembly-flavor intel', "-ex", 'x/1i ' + hex(self.reg_vals["eip"])]
                     p = subprocess.Popen(args, stdout=subprocess.PIPE)
                     inst, _ = p.communicate()
@@ -150,6 +150,7 @@ class CustomRunner(object):
 
             ret = p.wait()
             self.returncode = p.returncode
+
             # did a crash occur?
             if ret < 0 or ret == 139:
                 if abs(ret) == signal.SIGSEGV or abs(ret) == signal.SIGILL or ret == 139:
