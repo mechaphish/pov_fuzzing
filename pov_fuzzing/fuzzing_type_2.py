@@ -1,4 +1,5 @@
 import os
+import struct
 import random
 import logging
 import tempfile
@@ -154,18 +155,63 @@ class Type2CrashFuzzer(object):
                     accepted_chars.add(chr(ord("A")+i-10))
             self._bases[base] = accepted_chars
 
+    def get_obvious_indices(self):
+        # preprocess the registers
+        obvious_indices = set()
+        for r in self.orig_regs:
+            val = self.orig_regs[r]
+            s = struct.pack("<I", val)
+            for pos in self._str_find_all(self.crash, s):
+                obvious_indices.update(pos+i for i in range(4))
+        return obvious_indices
+
     def run(self):
         if USE_ANGR:
             self.pool = Pool(processes=8)
         else:
             l.debug("have %d cores", multiprocessing.cpu_count())
             self.pool = Pool(processes=multiprocessing.cpu_count())
-        # for each byte of input we will try all possible characters and determine how they change bits in the registers
-        # FIXME fake range here
-        for i in range(0, len(self.crash)):
+
+        non_interesting = set()
+
+        # process the obvious indices first
+        obvious_indices = self.get_obvious_indices()
+        for i in obvious_indices:
             interesting = self.analyze_bytes([i])
             if not interesting:
-                interesting = self.check_for_multiple(i)
+                non_interesting.add(i)
+
+        # if we are done return
+        self.post_filter()
+        self.post_analysis()
+        if self.exploitable():
+            l.debug("found obvious indices worked")
+            self.pool.close()
+            return
+
+        l.debug("not found in the obvious indices, running full scan")
+
+        # for each byte of input we will try all possible characters and determine how they change bits in the registers
+        for i in range(0, len(self.crash)):
+            if i in obvious_indices:
+                continue
+            interesting = self.analyze_bytes([i])
+            if not interesting:
+                non_interesting.add(i)
+
+        # if we are done return
+        self.post_filter()
+        self.post_analysis()
+        if self.exploitable():
+            self.pool.close()
+            return
+
+        l.debug("not found in single bytes fuzzing multiple")
+
+        # check the non-interesting for multiples
+        for i in non_interesting:
+            self.check_for_multiple(i)
+
         self.pool.close()
 
     @staticmethod
