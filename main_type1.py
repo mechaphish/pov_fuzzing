@@ -49,7 +49,11 @@ job = PovFuzzer1Job.find(job_id)
 if job is None:
     raise Exception("Couldn't find job %d", job_id)
 
-cbn = job.cs.cbns_original[0]
+if job.cs.is_multi_cbn:
+    cbnp = map(lambda c: c.path, job.cs.cbns_original)
+else:
+    cbnp = job.cs.cbns_original[0].path
+
 crash = job.input_crash
 
 crash_payload = str(crash.blob)
@@ -57,8 +61,8 @@ if len(crash_payload) > 20000:
     l.warning("payload has %d bytes, refusing to run", len(crash_payload))
     sys.exit(0)
 
-l.info("Pov fuzzer 1 beginning to exploit crash %d for cbn %d", crash.id, cbn.id)
-pov_fuzzer = pov_fuzzing.Type1CrashFuzzer(cbn.path, crash=crash_payload)
+l.info("Pov fuzzer 1 beginning to exploit crash %d for challenge %s", crash.id, job.cs.name)
+pov_fuzzer = pov_fuzzing.Type1CrashFuzzer(cbnp, crash=crash_payload)
 
 crashing_test = job.input_crash
 

@@ -68,12 +68,14 @@ class ComplexAnalysisException(CrashFuzzerException):
 # TODO rewrite to construct payload in sections of sends or at least where things need to be changed
 # have qemu write to stderr?
 def _get_reg_vals(binary_input_byte):
-    binary, test_input, c = binary_input_byte
+    binaries, test_input, c = binary_input_byte
     try:
         if USE_ANGR:
-            r = tracer.Runner(binary, input=test_input)
+            if len(binaries) > 1:
+                raise ValueError("No support for MultiCB with USE_ANGR=True")
+            r = tracer.Runner(binaries[0], input=test_input)
         else:
-            r = CustomRunner(binary, payload=test_input)
+            r = CustomRunner(binaries, payload=test_input)
         if not r.crash_mode:
             return [c, None]
         else:
@@ -91,18 +93,24 @@ def _get_reg_vals(binary_input_byte):
 class Type1CrashFuzzer(object):
     def __init__(self, binary, crash=None):
         """
-        :param binary: path to the binary which crashed
+        :param binary: path to the binary which crashed (or list of binaries)
         :param crash: string of input which crashed the binary
         """
 
-        self.binary = binary
+        if isinstance(binary, (list, tuple)):
+            self.binaries = binary
+        else:
+            self.binaries = [binary]
+
         self.crash = crash
 
         # verify it actually crashes the binary
         if USE_ANGR:
-            r = tracer.Runner(self.binary, input=self.crash)
+            if len(self.binaries) > 0:
+                raise ValueError("No support for MultiCBs with USE_ANGR=True")
+            r = tracer.Runner(self.binaries[0], input=self.crash)
         else:
-            r = CustomRunner(self.binary, payload=self.crash)
+            r = CustomRunner(self.binaries, payload=self.crash)
         if not r.crash_mode:
             raise CrashFuzzerException("input did not crash the binary")
 
@@ -146,8 +154,11 @@ class Type1CrashFuzzer(object):
         if USE_ANGR:
             self.pool = Pool(processes=8)
         else:
-            l.debug("have %d cores", multiprocessing.cpu_count())
-            self.pool = Pool(processes=multiprocessing.cpu_count())
+            cpus = multiprocessing.cpu_count()
+            l.debug("have %d cores", cpus)
+            if len(self.binaries) > 1:
+                cpus = cpus * len(self.binaries)
+            self.pool = Pool(processes=cpus)
 
         non_interesting = set()
 
@@ -240,7 +251,7 @@ class Type1CrashFuzzer(object):
         binary_input_bytes = []
         for i in _PREFILTER_BYTES:
             test_input = self._replace_indices(self.crash, chr(i), byte_indices)
-            binary_input_bytes.append((self.binary, test_input, chr(i)))
+            binary_input_bytes.append((self.binaries, test_input, chr(i)))
         it = self.pool.imap_unordered(_get_reg_vals, binary_input_bytes)
         for c, reg_vals in it:
             if reg_vals is not None:
@@ -267,7 +278,7 @@ class Type1CrashFuzzer(object):
             if i in _PREFILTER_BYTES:
                 continue
             test_input = self._replace_indices(self.crash, chr(i), byte_indices)
-            binary_input_bytes.append((self.binary, test_input, chr(i)))
+            binary_input_bytes.append((self.binaries, test_input, chr(i)))
         it = self.pool.imap_unordered(_get_reg_vals, binary_input_bytes, chunksize=4)
         for c, reg_vals in it:
             if reg_vals is not None:
@@ -494,7 +505,7 @@ class Type1CrashFuzzer(object):
         for i in range(1, current_len + 10):
             test_input = self._replace_indices_len(self.crash, "1"*i, current_len, byte_indices)
             expected = int("1"*i, base) & 0xffffffff
-            reg_vals = _get_reg_vals((self.binary, test_input, 0))[1]
+            reg_vals = _get_reg_vals((self.binaries, test_input, 0))[1]
             if reg_vals is None or reg_vals[reg] != expected:
                 pass
             else:
@@ -784,7 +795,7 @@ translate_byte_%#x(curr, orig);
         self.dump_binary(filename=pov_binary_filename)
 
         pov_tester = CGCPovSimulator()
-        return pov_tester.test_binary_pov(pov_binary_filename, self.binary)
+        return pov_tester.test_binary_pov(pov_binary_filename, self.binaries[0])
 
     @staticmethod
     def collapse_bits(val, mask):

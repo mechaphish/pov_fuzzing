@@ -18,8 +18,10 @@ class RunnerError(Exception):
 
 
 class CustomRunner(object):
-    def __init__(self, binary, payload, record_stdout=False, grab_crashing_inst=False):
-        self.binary = binary
+    SEED = "0262f0af52bbe292c7f54469239a86b2a8ffaecc6880e7da5e434fd5b57b827b06d9945a47fbdd2f1b2f43a0ff4c1b7f"
+
+    def __init__(self, binaries, payload, record_stdout=False, grab_crashing_inst=False):
+        self.binaries = binaries
         self.payload = payload
         self._set_memory_limit(1024 * 1024 * 1024)
         self.reg_vals = dict()
@@ -27,17 +29,20 @@ class CustomRunner(object):
         self.crashing_inst = None
         self.stdout = None
 
+        self.base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
         # check the binary
-        if not os.access(self.binary, os.X_OK):
-            if os.path.isfile(self.binary):
-                l.error("\"%s\" binary is not executable", self.binary)
-                raise RunnerError
-            else:
-                l.error("\"%s\" binary does not exist", self.binary)
-                raise RunnerError
+        for binary in self.binaries:
+            if not os.access(binary, os.X_OK):
+                if os.path.isfile(binary):
+                    l.error("\"%s\" binary is not executable", binary)
+                    raise RunnerError
+                else:
+                    l.error("\"%s\" binary does not exist", binary)
+                    raise RunnerError
 
         if record_stdout:
-            tmp = tempfile.mktemp(prefix="stdout_" + os.path.basename(binary))
+            tmp = tempfile.mktemp(prefix="stdout_" + os.path.basename(self.binaries[0]))
             # will set crash_mode correctly
             self.dynamic_trace(stdout_file=tmp, grab_crashing_inst=grab_crashing_inst)
             with open(tmp, "rb") as f:
@@ -62,26 +67,35 @@ class CustomRunner(object):
         # allow cores to be dumped
         saved_limit = resource.getrlimit(resource.RLIMIT_CORE)
         resource.setrlimit(resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
-        binary_old = self.binary
-        binary_replacement_fname = os.path.join(tmpdir, "binary_replacement")
-        shutil.copy(self.binary, binary_replacement_fname)
-        self.binary = binary_replacement_fname
+        binaries_old = [ ]
+        for binary in self.binaries:
+            binaries_old.append(binary)
+
+        self.binaries = [ ]
+        for i, binary in enumerate(binaries_old):
+            binary_replacement_fname = os.path.join(tmpdir, "binary_replacement_%d" % i)
+            shutil.copy(binary, binary_replacement_fname)
+            self.binaries.append(binary_replacement_fname)
+
         os.chdir(tmpdir)
+
         try:
             yield (tmpdir, binary_replacement_fname)
+
         finally:
             assert tmpdir.startswith(prefix)
             shutil.rmtree(tmpdir)
             os.chdir(curdir)
             resource.setrlimit(resource.RLIMIT_CORE, saved_limit)
-            self.binary = binary_old
+            self.binaries = binaries_old
 
     def dynamic_trace(self, stdout_file=None, grab_crashing_inst=False):
         with self._setup_env() as (tmpdir,binary_replacement_fname):
             # get the dynamic trace
             self._run_trace(stdout_file=stdout_file)
 
-            if self.crash_mode:
+            # multicb runner doesn't have a standard return code, always search for core
+            if self.crash_mode or len(self.binaries) > 1:
                 # find core file
                 core_files = filter(
                         lambda x: x == "core",
@@ -92,6 +106,9 @@ class CustomRunner(object):
                     l.warning("NO CORE FOUND")
                     self.crash_mode = False
                     return
+                else:
+                    self.crash_mode = True
+
                 a_mesg = "Empty core file generated"
                 if os.path.getsize(core_files[0]) == 0:
                     l.warning(a_mesg)
@@ -113,7 +130,14 @@ class CustomRunner(object):
         accumulate a basic block trace using qemu
         """
 
-        args = ["timeout", "-k", "0.05", "0.05", os.path.abspath(self.binary), "seed=0262f0af52bbe292c7f54469239a86b2a8ffaecc6880e7da5e434fd5b57b827b06d9945a47fbdd2f1b2f43a0ff4c1b7f"]
+        timeout = 0.05
+        if len(self.binaries) > 1:
+            timeout = 0.25
+
+        args  = ["timeout", "-k", str(timeout), str(timeout)]
+        args += [os.path.join(self.base_dir, "bin", "fakesingle")]
+        args += ["-s", self.SEED]
+        args += self.binaries
 
         with open('/dev/null', 'wb') as devnull:
             stdout_f = devnull
