@@ -18,12 +18,17 @@ for f in os.listdir(bin_path):
     os.chmod(os.path.join(bin_path, f), 0777)
     os.chmod(os.path.join(bin_path, f), 0777)
 
-def _test_exploit(pov, binary):
+def _test_exploit(pov, binaries):
     f1 = tempfile.mktemp(suffix=".pov")
     with open(f1, "wb") as f:
         f.write(pov)
     os.chmod(f1, 0777)
-    args = ["cb-test", "--negotiate", "--cb", binary, "--directory", ".", "--timeout", "3", "--should_core", "--xml", f1]
+
+    args  = ["cb-test", "--negotiate"]
+    args += ["--cb"]
+    args += binaries
+    args += ["--directory", ".", "--timeout", "3", "--should_core", "--xml", f1]
+
     p = subprocess.Popen(args, stdout=subprocess.PIPE)
     stdout, stderr = p.communicate()
     os.remove(f1)
@@ -37,7 +42,7 @@ def _test_exploit(pov, binary):
 
 def _get_pov_score(fuzzer):
     pov = fuzzer.dump_binary()
-    binary = fuzzer.binary
+    binary = fuzzer.binaries
     return [_test_exploit(pov, binary) for _ in range(10)].count(True) / 10.0
 
 if len(sys.argv) != 2:
