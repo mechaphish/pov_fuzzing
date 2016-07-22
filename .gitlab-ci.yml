@@ -1,0 +1,5 @@
+update_vm_image:
+    only: ["master"]
+    script:
+    - update-vm-image
+    tags: ["docker-builder"]
