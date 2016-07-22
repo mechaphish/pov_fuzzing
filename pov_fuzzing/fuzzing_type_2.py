@@ -98,18 +98,25 @@ def _get_reg_vals(binary_input_byte):
 class Type2CrashFuzzer(object):
     def __init__(self, binary, crash=None):
         """
-        :param binary: path to the binary which crashed
+        :param binary: path to the binary which crashed (or list of binaries)
         :param crash: string of input which crashed the binary
         """
 
-        self.binary = binary
+        if isinstance(binary, (list, tuple)):
+            self.binaries = binary
+            raise ValueError("Type2CrashFuzzer does not support MultiCBs yet")
+        else:
+            self.binaries = [binary]
+
         self.crash = crash
 
         # verify it actually crashes the binary
         if USE_ANGR:
-            r = tracer.Runner(self.binary, input=self.crash, record_stdout=True)
+            if len(self.binaries) > 0:
+                raise ValueError("No support for MultiCBs with USE_ANGR=True")
+            r = tracer.Runner(self.binaries, input=self.crash, record_stdout=True)
         else:
-            r = CustomRunner(self.binary, payload=self.crash, record_stdout=True)
+            r = CustomRunner(self.binaries, payload=self.crash, record_stdout=True)
         if not r.crash_mode:
             raise CrashFuzzerException("input did not crash the binary")
 
@@ -258,7 +265,7 @@ class Type2CrashFuzzer(object):
 
     def _get_reg_eqn(self):
         # verify it actually crashes the binary
-        r = CustomRunner(self.binary, payload=self.crash, grab_crashing_inst=True)
+        r = CustomRunner(self.binaries, payload=self.crash, grab_crashing_inst=True)
         if not r.crash_mode:
             raise CrashFuzzerException("input did not crash the binary")
         if r.crashing_inst is None or len(r.crashing_inst) == 0:
@@ -289,7 +296,7 @@ class Type2CrashFuzzer(object):
         binary_input_bytes = []
         for i in _PREFILTER_BYTES:
             test_input = self._replace_indices(self.crash, chr(i), byte_indices)
-            binary_input_bytes.append((self.binary, test_input, chr(i)))
+            binary_input_bytes.append((self.binaries, test_input, chr(i)))
         it = self.pool.imap_unordered(_get_reg_vals, binary_input_bytes)
         for c, reg_vals in it:
             if reg_vals is not None:
@@ -324,7 +331,7 @@ class Type2CrashFuzzer(object):
             if i in _PREFILTER_BYTES:
                 continue
             test_input = self._replace_indices(self.crash, chr(i), byte_indices)
-            binary_input_bytes.append((self.binary, test_input, chr(i)))
+            binary_input_bytes.append((self.binaries, test_input, chr(i)))
         it = self.pool.imap_unordered(_get_reg_vals, binary_input_bytes, chunksize=4)
         for c, reg_vals in it:
             if reg_vals is not None:
@@ -561,7 +568,7 @@ class Type2CrashFuzzer(object):
         for i in range(1, current_len + 10):
             test_input = self._replace_indices_len(self.crash, "1"*i, current_len, byte_indices)
             expected = int("1"*i, base) & 0xffffffff
-            reg_vals = _get_reg_vals((self.binary, test_input, 0))[1]
+            reg_vals = _get_reg_vals((self.binaries, test_input, 0))[1]
             if reg_vals is None or reg_vals[reg] != expected:
                 pass
             else:
@@ -692,9 +699,11 @@ class Type2CrashFuzzer(object):
                 new_input = self._replace_indices(new_input, b, [index])
 
             if USE_ANGR:
-                r = tracer.Runner(self.binary, input=new_input, record_stdout=True, record_magic=True)
+                if len(self.binaries) > 0:
+                    raise ValueError("No support for MultiCBs with USE_ANGR=True")
+                r = tracer.Runner(self.binaries, input=new_input, record_stdout=True, record_magic=True)
             else:
-                r = CustomRunner(self.binary, payload=new_input, record_stdout=True)
+                r = CustomRunner(self.binaries, payload=new_input, record_stdout=True)
                 path = os.path.join(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../'),
                                     "flag_page_with_seed_0262f0af52bbe292c7f54469239a86b2a8ffaecc6880e7da5e434fd5b57b827b06d9945a47fbdd2f1b2f43a0ff4c1b7f")
                 with open(path) as f:
@@ -775,7 +784,7 @@ class Type2CrashFuzzer(object):
         self.dump_binary(filename=pov_binary_filename)
 
         pov_tester = CGCPovSimulator()
-        result = pov_tester.test_binary_pov(pov_binary_filename, self.binary, enable_randomness=enable_randomness,
+        result = pov_tester.test_binary_pov(pov_binary_filename, self.binaries[0], enable_randomness=enable_randomness,
                                             timeout=timeout)
         os.remove(pov_binary_filename)
         return result

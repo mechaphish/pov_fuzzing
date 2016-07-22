@@ -18,12 +18,17 @@ for f in os.listdir(bin_path):
     os.chmod(os.path.join(bin_path, f), 0777)
     os.chmod(os.path.join(bin_path, f), 0777)
 
-def _test_exploit(pov, binary):
+def _test_exploit(pov, binaries):
     f1 = tempfile.mktemp(suffix=".pov")
     with open(f1, "wb") as f:
         f.write(pov)
     os.chmod(f1, 0777)
-    args = ["cb-test", "--negotiate", "--cb", binary, "--directory", ".", "--timeout", "3", "--should_core", "--xml", f1]
+
+    args  = ["cb-test", "--negotiate"]
+    args += ["--cb"]
+    args += binaries
+    args += ["--directory", ".", "--timeout", "3", "--should_core", "--xml", f1]
+
     p = subprocess.Popen(args, stdout=subprocess.PIPE)
     stdout, stderr = p.communicate()
     os.remove(f1)
@@ -37,7 +42,7 @@ def _test_exploit(pov, binary):
 
 def _get_pov_score(fuzzer):
     pov = fuzzer.dump_binary()
-    binary = fuzzer.binary
+    binary = fuzzer.binaries
     return [_test_exploit(pov, binary) for _ in range(10)].count(True) / 10.0
 
 if len(sys.argv) != 2:
@@ -49,7 +54,11 @@ job = PovFuzzer1Job.find(job_id)
 if job is None:
     raise Exception("Couldn't find job %d", job_id)
 
-cbn = job.cs.cbns_original[0]
+if job.cs.is_multi_cbn:
+    cbnp = map(lambda c: c.path, job.cs.cbns_original)
+else:
+    cbnp = job.cs.cbns_original[0].path
+
 crash = job.input_crash
 
 crash_payload = str(crash.blob)
@@ -57,8 +66,8 @@ if len(crash_payload) > 20000:
     l.warning("payload has %d bytes, refusing to run", len(crash_payload))
     sys.exit(0)
 
-l.info("Pov fuzzer 1 beginning to exploit crash %d for cbn %d", crash.id, cbn.id)
-pov_fuzzer = pov_fuzzing.Type1CrashFuzzer(cbn.path, crash=crash_payload)
+l.info("Pov fuzzer 1 beginning to exploit crash %d for challenge %s", crash.id, job.cs.name)
+pov_fuzzer = pov_fuzzing.Type1CrashFuzzer(cbnp, crash=crash_payload)
 
 crashing_test = job.input_crash
 
