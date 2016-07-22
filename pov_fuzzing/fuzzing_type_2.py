@@ -104,7 +104,6 @@ class Type2CrashFuzzer(object):
 
         if isinstance(binary, (list, tuple)):
             self.binaries = binary
-            raise ValueError("Type2CrashFuzzer does not support MultiCBs yet")
         else:
             self.binaries = [binary]
 
