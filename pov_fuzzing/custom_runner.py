@@ -64,6 +64,11 @@ class CustomRunner(object):
         prefix = "/tmp/tracer_"
         curdir = os.getcwd()
         tmpdir = tempfile.mkdtemp(prefix=prefix)
+        # dont prefilter the core
+        if len(self.binaries) > 1:
+            with open("/proc/self/coredump_filter", "wb") as f:
+                f.write("00000077")
+
         # allow cores to be dumped
         saved_limit = resource.getrlimit(resource.RLIMIT_CORE)
         resource.setrlimit(resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
@@ -117,13 +122,22 @@ class CustomRunner(object):
                 self._load_core_values(core_files[0])
 
                 if grab_crashing_inst and self.reg_vals is not None and "eip" in self.reg_vals:
-                    p1 = subprocess.Popen([os.path.abspath(self.binaries[0])], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-                    args = ["sudo", "gdb", "-q", "-batch", "-p", str(p1.pid), "-ex", 'set disassembly-flavor intel', "-ex", 'x/1i ' + hex(self.reg_vals["eip"])]
-                    p = subprocess.Popen(args, stdout=subprocess.PIPE)
-                    inst, _ = p.communicate()
-                    p1.kill()
-                    inst = inst.split(":")[-1].strip()
-                    self.crashing_inst = inst
+
+                    if len(self.binaries) > 1:
+                        args = ["gdb", "-q", "-batch", "-ex", "set disassembly-flavor intel", "-ex", "x/1i" + hex(self.reg_vals["eip"]), "-c", "core"]
+                        p = subprocess.Popen(args, stdout=subprocess.PIPE)
+                        inst, _ = p.communicate()
+                        p.wait() 
+                        inst = inst.split(":")[-1].strip()
+                        self.crashing_inst = inst
+                    else:
+                        p1 = subprocess.Popen([os.path.abspath(self.binaries[0])], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                        args = ["sudo", "gdb", "-q", "-batch", "-p", str(p1.pid), "-ex", 'set disassembly-flavor intel', "-ex", 'x/1i ' + hex(self.reg_vals["eip"])]
+                        p = subprocess.Popen(args, stdout=subprocess.PIPE)
+                        inst, _ = p.communicate()
+                        p1.kill()
+                        inst = inst.split(":")[-1].strip()
+                        self.crashing_inst = inst
 
     def _run_trace(self, stdout_file=None):
         """
