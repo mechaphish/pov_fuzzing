@@ -698,22 +698,28 @@ class Type2CrashFuzzer(object):
                 new_input = self._replace_indices(new_input, b, [index])
 
             if USE_ANGR:
-                if len(self.binaries) > 0:
-                    raise ValueError("No support for MultiCBs with USE_ANGR=True")
-                r = tracer.Runner(self.binaries, input=new_input, record_stdout=True, record_magic=True)
+                raise Exception("not implemented")
             else:
                 r = CustomRunner(self.binaries, payload=new_input, record_stdout=True)
                 path = os.path.join(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../'),
                                     "flag_page_with_seed_0262f0af52bbe292c7f54469239a86b2a8ffaecc6880e7da5e434fd5b57b827b06d9945a47fbdd2f1b2f43a0ff4c1b7f")
                 with open(path) as f:
                     r.magic = f.read()
+
+                r2 = CustomRunner(self.binaries, payload=new_input, record_stdout=True, use_alt_flag=True)
+                path = os.path.join(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../'),
+                                    "flag_page_with_seed_121212121212121212121212121231231231231231231231231231231231231231231231231231231231231231231231")
+                with open(path) as f:
+                    r2.magic = f.read()
+
             new_stdout = r.stdout
             if len(new_stdout) > len(self.orig_stdout):
                 # okay we have a leak
                 # now we should try to guess what we leaked
                 leak_idx = None
-                for i in range(len(new_stdout)):
-                    if new_stdout[i:i+4] in r.magic:
+                for i in range(len(self.orig_stdout), len(new_stdout)-3):
+                    if new_stdout[i:i+4] in r.magic and r2.stdout[i:i+4] in r2.magic and \
+                            len(new_stdout[i:i+4]) == 4 and len(r2.stdout[i:i+4]) == 4:
                         leak_idx = i
                         break
                 if leak_idx is None:

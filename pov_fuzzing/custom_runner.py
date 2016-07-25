@@ -19,8 +19,9 @@ class RunnerError(Exception):
 
 class CustomRunner(object):
     SEED = "0262f0af52bbe292c7f54469239a86b2a8ffaecc6880e7da5e434fd5b57b827b06d9945a47fbdd2f1b2f43a0ff4c1b7f"
+    SEED_ALT = "121212121212121212121212121231231231231231231231231231231231231231231231231231231231231231231231"
 
-    def __init__(self, binaries, payload, record_stdout=False, grab_crashing_inst=False):
+    def __init__(self, binaries, payload, record_stdout=False, grab_crashing_inst=False, use_alt_flag=False):
         self.binaries = binaries
         self.payload = payload
         self._set_memory_limit(1024 * 1024 * 1024)
@@ -28,6 +29,7 @@ class CustomRunner(object):
         self.crash_mode = False
         self.crashing_inst = None
         self.stdout = None
+        self.use_alt_flag = use_alt_flag
 
         self.base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -150,7 +152,10 @@ class CustomRunner(object):
 
         args  = ["timeout", "-k", str(timeout), str(timeout)]
         args += [os.path.join(self.base_dir, "bin", "fakesingle")]
-        args += ["-s", self.SEED]
+        if self.use_alt_flag:
+            args += ["-s", self.SEED_ALT]
+        else:
+            args += ["-s", self.SEED]
         args += self.binaries
 
         with open('/dev/null', 'wb') as devnull:
@@ -180,5 +185,3 @@ class CustomRunner(object):
             self.reg_vals = dict(CoreLoader(core_file).registers)
         except ParseError as e:
             l.warning(e)
-
-
