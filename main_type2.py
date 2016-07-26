@@ -18,6 +18,10 @@ for f in os.listdir(bin_path):
     os.chmod(os.path.join(bin_path, f), 0777)
     os.chmod(os.path.join(bin_path, f), 0777)
 
+# make fake_single executable
+fakesingle_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "bin/fakesingle")
+os.chmod(fakesingle_path)
+
 def _test_exploit(pov, binaries):
     f1 = tempfile.mktemp(suffix=".pov")
     with open(f1, "wb") as f:
