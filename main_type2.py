@@ -67,9 +67,6 @@ cbn = job.cs.cbns_original[0]
 crash = job.input_crash
 
 crash_payload = str(crash.blob)
-if len(crash_payload) > 20000:
-    l.warning("payload has %d bytes, refusing to run", len(crash_payload))
-    sys.exit(0)
 
 l.info("Pov fuzzer 2 beginning to exploit crash %d for challenge %s", crash.id, job.cs.name)
 pov_fuzzer = pov_fuzzing.Type2CrashFuzzer(cbnp, crash=crash_payload)

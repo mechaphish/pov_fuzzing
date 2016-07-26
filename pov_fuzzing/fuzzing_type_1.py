@@ -177,6 +177,11 @@ class Type1CrashFuzzer(object):
             self.pool.close()
             return
 
+        if len(self.crash) > 20000:
+            self.pool.close()
+            l.warning("could not exploit with obvious and crash is too long for full scan")
+            return
+
         l.debug("not found in the obvious indices, running full scan")
 
         # for each byte of input we will try all possible characters and determine how they change bits in the registers
