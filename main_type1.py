@@ -20,7 +20,7 @@ for f in os.listdir(bin_path):
 
 # make fake_single executable
 fakesingle_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "bin/fakesingle")
-os.chmod(fakesingle_path)
+os.chmod(fakesingle_path, 0777)
 
 
 def _test_exploit(pov, binaries):
