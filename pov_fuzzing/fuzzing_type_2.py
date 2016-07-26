@@ -197,7 +197,7 @@ class Type2CrashFuzzer(object):
 
         if len(self.crash) > 20000:
             self.pool.close()
-            l.warning("could not exploit with obvious and crash is too long for full scan")
+            l.warning("could not exploit with obvious and crash is too long for full scan...")
             return
 
         l.debug("not found in the obvious indices, running full scan")
