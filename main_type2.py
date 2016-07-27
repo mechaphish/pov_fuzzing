@@ -61,9 +61,8 @@ if job is None:
 if job.cs.is_multi_cbn:
     cbnp = map(lambda c: c.path, job.cs.cbns_original)
 else:
-    cbnp = job.cs.cbns_original[0]
+    cbnp = job.cs.cbns_original[0].path
 
-cbn = job.cs.cbns_original[0]
 crash = job.input_crash
 
 crash_payload = str(crash.blob)

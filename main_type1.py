@@ -47,8 +47,8 @@ def _test_exploit(pov, binaries):
 
 def _get_pov_score(fuzzer):
     pov = fuzzer.dump_binary()
-    binary = fuzzer.binaries
-    return [_test_exploit(pov, binary) for _ in range(10)].count(True) / 10.0
+    binaries = fuzzer.binaries
+    return [_test_exploit(pov, binaries) for _ in range(10)].count(True) / 10.0
 
 if len(sys.argv) != 2:
     print "Usage:", "job_id"
