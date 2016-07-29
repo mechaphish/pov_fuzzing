@@ -7,6 +7,8 @@ from collections import defaultdict
 from multiprocessing import Pool
 import multiprocessing
 
+from . import CrashFuzzerException
+
 l = logging.getLogger("rex.fuzzing_type_1")
 logging.getLogger("tracer.Runner").setLevel("WARNING")
 logging.getLogger("cle.elfcore").setLevel("CRITICAL")
@@ -51,10 +53,6 @@ class NumberStr(object):
         self.end_idx = end_idx
         self.base = base
         self.max_val = max_val
-
-
-class CrashFuzzerException(Exception):
-    pass
 
 
 class ComplexAnalysisException(CrashFuzzerException):

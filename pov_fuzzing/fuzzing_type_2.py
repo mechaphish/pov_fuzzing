@@ -10,6 +10,8 @@ import multiprocessing
 from collections import defaultdict
 from multiprocessing import Pool
 
+from . import CrashFuzzerException
+
 l = logging.getLogger("rex.fuzzing_type_2")
 logging.getLogger("cle.elfcore").setLevel("CRITICAL")
 logging.getLogger("tracer.Runner").setLevel("WARNING")
@@ -58,10 +60,6 @@ class NumberStr(object):
         self.end_idx = end_idx
         self.base = base
         self.max_val = max_val
-
-
-class CrashFuzzerException(Exception):
-    pass
 
 
 class ComplexAnalysisException(CrashFuzzerException):
@@ -243,7 +241,7 @@ class Type2CrashFuzzer(object):
             if r in new_eqn:
                 new_eqn = new_eqn.replace(r, hex(v))
         try:
-            result = eval(new_eqn)
+            result = eval(new_eqn) & 0xffffffff
             return {"AST": result, "eip": reg_vals["eip"]}
         except SyntaxError as e:
             raise CrashFuzzerException("syntax error %s", e)

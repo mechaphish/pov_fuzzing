@@ -69,19 +69,23 @@ crash = job.input_crash
 crash_payload = str(crash.blob)
 
 l.info("Pov fuzzer 1 beginning to exploit crash %d for challenge %s", crash.id, job.cs.name)
-pov_fuzzer = pov_fuzzing.Type1CrashFuzzer(cbnp, crash=crash_payload)
+try:
+    pov_fuzzer = pov_fuzzing.Type1CrashFuzzer(cbnp, crash=crash_payload)
 
-crashing_test = job.input_crash
+    crashing_test = job.input_crash
 
-if pov_fuzzer.exploitable():
-    e = Exploit.create(cs=job.cs, job=job, pov_type='type1',
-                       method="fuzzer",
-                       c_code=pov_fuzzer.dump_c(),
-                       blob=pov_fuzzer.dump_binary(),
-                       crash=crashing_test)
-    e.reliability = _get_pov_score(pov_fuzzer)
-    e.save()
+    if pov_fuzzer.exploitable():
+        e = Exploit.create(cs=job.cs, job=job, pov_type='type1',
+                           method="fuzzer",
+                           c_code=pov_fuzzer.dump_c(),
+                           blob=pov_fuzzer.dump_binary(),
+                           crash=crashing_test)
+        e.reliability = _get_pov_score(pov_fuzzer)
+        e.save()
 
-    l.info("crash was able to be exploited")
-else:
-    l.warning("Not exploitable")
+        l.info("crash was able to be exploited")
+    else:
+        l.warning("Not exploitable")
+
+except pov_fuzzing.CrashFuzzerException as e:
+    l.warning(e.message)
