@@ -238,7 +238,7 @@ class Type2CrashFuzzer(object):
     def _fix_reg_vals(self, reg_vals):
         new_eqn = self.addr_eqn
         for r, v in reg_vals.items():
-            if r in new_eqn:
+            if r in CGC_GENERAL_REGS and r in new_eqn:
                 new_eqn = new_eqn.replace(r, hex(v))
         try:
             result = eval(new_eqn) & 0xffffffff
