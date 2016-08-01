@@ -1,3 +1,4 @@
+import time
 import struct
 import random
 import logging
@@ -65,7 +66,9 @@ class ComplexAnalysisException(CrashFuzzerException):
 # TODO make this fast bprm->core_dump
 # TODO rewrite to construct payload in sections of sends or at least where things need to be changed
 # have qemu write to stderr?
+glob_ids_rules = None
 def _get_reg_vals(binary_input_byte):
+    global glob_ids_rules
     binaries, test_input, c = binary_input_byte
     try:
         if USE_ANGR:
@@ -73,7 +76,7 @@ def _get_reg_vals(binary_input_byte):
                 raise ValueError("No support for MultiCB with USE_ANGR=True")
             r = tracer.Runner(binaries[0], input=test_input)
         else:
-            r = CustomRunner(binaries, payload=test_input)
+            r = CustomRunner(binaries, payload=test_input, ids_rules=glob_ids_rules)
         if not r.crash_mode:
             return [c, None]
         else:
@@ -89,10 +92,12 @@ def _get_reg_vals(binary_input_byte):
 # TODO Make sure we only look at general registers that cgc accepts
 # TODO we assume the input is constant length ie random/flag page has no effect on it
 class Type1CrashFuzzer(object):
-    def __init__(self, binary, crash=None):
+    def __init__(self, binary, crash=None, ids_rules=None, time_limit=None):
         """
         :param binary: path to the binary which crashed (or list of binaries)
         :param crash: string of input which crashed the binary
+        :param ids_rules: the string ids rules
+        :param time_limit: the max time in seconds
         """
 
         if isinstance(binary, (list, tuple)):
@@ -101,6 +106,9 @@ class Type1CrashFuzzer(object):
             self.binaries = [binary]
 
         self.crash = crash
+        global glob_ids_rules
+        glob_ids_rules = ids_rules
+        self.ids_rules = ids_rules
 
         # verify it actually crashes the binary
         if USE_ANGR:
@@ -108,7 +116,7 @@ class Type1CrashFuzzer(object):
                 raise ValueError("No support for MultiCBs with USE_ANGR=True")
             r = tracer.Runner(self.binaries[0], input=self.crash)
         else:
-            r = CustomRunner(self.binaries, payload=self.crash)
+            r = CustomRunner(self.binaries, payload=self.crash, ids_rules=glob_ids_rules)
         if not r.crash_mode:
             raise CrashFuzzerException("input did not crash the binary")
 
@@ -124,6 +132,8 @@ class Type1CrashFuzzer(object):
         self.byte_translation_funcs = list()
         self.byte_translation_calls = dict()
         self._bit_patterns = dict()
+        time_limit = time_limit if time_limit is not None else 2000
+        self._end_time = time.time() + time_limit
 
         self.make_bases()
         self.run()
@@ -235,6 +245,10 @@ class Type1CrashFuzzer(object):
         return all_patterns
 
     def analyze_bytes(self, byte_indices):
+        if time.time() > self._end_time:
+            l.error("timedout")
+            return False
+
         if any(i in self.skip_bytes for i in byte_indices):
             return False
         if frozenset(set(byte_indices)) in self.skip_sets:

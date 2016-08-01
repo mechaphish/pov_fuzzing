@@ -8,7 +8,7 @@ import subprocess
 import contextlib
 
 from .core_loader import CoreLoader, ParseError
-
+from pov_fuzzing.ids import NetworkFilter
 
 l = logging.getLogger("rex.pov_fuzzing.custom_runner")
 
@@ -17,11 +17,15 @@ class RunnerError(Exception):
     pass
 
 
+nf_dict = dict()
+
+
 class CustomRunner(object):
     SEED = "0262f0af52bbe292c7f54469239a86b2a8ffaecc6880e7da5e434fd5b57b827b06d9945a47fbdd2f1b2f43a0ff4c1b7f"
     SEED_ALT = "121212121212121212121212121231231231231231231231231231231231231231231231231231231231231231231231"
 
-    def __init__(self, binaries, payload, record_stdout=False, grab_crashing_inst=False, use_alt_flag=False):
+    def __init__(self, binaries, payload, record_stdout=False, grab_crashing_inst=False, use_alt_flag=False,
+                 ids_rules=None):
         self.binaries = binaries
         self.payload = payload
         self._set_memory_limit(1024 * 1024 * 1024)
@@ -30,6 +34,10 @@ class CustomRunner(object):
         self.crashing_inst = None
         self.stdout = None
         self.use_alt_flag = use_alt_flag
+        self.ids_rules = ids_rules
+
+        if self.ids_rules is not None:
+            self.fix_payload_for_ids()
 
         self.base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -54,6 +62,14 @@ class CustomRunner(object):
             # will set crash_mode correctly
             self.dynamic_trace(grab_crashing_inst=grab_crashing_inst)
 
+    def fix_payload_for_ids(self):
+        global nf_dict
+        if self.ids_rules in nf_dict:
+            nf = nf_dict[self.ids_rules]
+        else:
+            nf = NetworkFilter(self.ids_rules)
+            nf_dict[self.ids_rules] = nf
+        self.payload = nf(0, nf.CLIENT, self.payload)[0]
 
     @staticmethod
     def _set_memory_limit(ml):
