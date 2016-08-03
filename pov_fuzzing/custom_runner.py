@@ -79,7 +79,7 @@ class CustomRunner(object):
     # at the end, it restores everything
     @contextlib.contextmanager
     def _setup_env(self):
-        prefix = "/tmp/tracer_"
+        prefix = "/dev/shm/tracer_"
         curdir = os.getcwd()
         tmpdir = tempfile.mkdtemp(prefix=prefix)
         # dont prefilter the core
@@ -92,18 +92,14 @@ class CustomRunner(object):
         resource.setrlimit(resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
         binaries_old = [ ]
         for binary in self.binaries:
-            binaries_old.append(binary)
+            binaries_old.append(os.path.abspath(binary))
 
-        self.binaries = [ ]
-        for i, binary in enumerate(binaries_old):
-            binary_replacement_fname = os.path.join(tmpdir, "binary_replacement_%d" % i)
-            shutil.copy(binary, binary_replacement_fname)
-            self.binaries.append(binary_replacement_fname)
+        self.binaries = list(binaries_old)
 
         os.chdir(tmpdir)
 
         try:
-            yield (tmpdir, binary_replacement_fname)
+            yield (tmpdir, self.binaries[0])
 
         finally:
             assert tmpdir.startswith(prefix)
